@@ -1,6 +1,6 @@
 package Perl6::Builtins;
 
-use version; $VERSION = qv('0.0.2');
+use version; $VERSION = qv('0.0.3');
 
 use warnings;
 use strict;
@@ -10,16 +10,55 @@ sub import {
     use Contextual::Return;
     my $package = shift;
 
+    # system...
     if (!@_ || grep m/\A system \z/xms, @_) {
-        *CORE::GLOBAL::system = sub {
-            undef $!;
-            my $status = CORE::system @_;
-            my $error = $!;
-            return
-                BOOL  { !$status }
-                VALUE { $error   };
-        };
+        *CORE::GLOBAL::system = \&_p6_system;
     }
+
+    # caller...
+    if (!@_ || grep m/\A caller \z/xms, @_) {
+        *CORE::GLOBAL::caller = \&_p6_caller;
+    }
+}
+
+sub _p6_system {
+    undef $!;
+    my $status = CORE::system @_;
+    my $error = $!;
+    return
+        BOOL  { !$status }
+        VALUE { $error   };
+}
+
+my @CALLER_FIELDS = qw(
+    package
+    file
+    line
+    sub
+    args
+    want
+    eval
+    require
+    hints
+    bitmask
+);
+
+sub _p6_caller {
+    my @caller;
+    if (@_) {
+        @caller = CORE::caller($_[0]+1);
+    }
+    else {
+        @caller = (CORE::caller(1))[0..2];
+    }
+    return (
+        HASHREF { my %hash;
+                  @hash{@CALLER_FIELDS} = @caller;
+                  \%hash;
+                }
+        SCALAR  { $caller[0]; }
+        LIST    { @caller; }
+    );
 }
 
 1; # Magic true value required at end of module
@@ -32,7 +71,7 @@ Perl6::Builtins - Provide Perl 5 versions of the new Perl 6 builtins
 
 =head1 VERSION
 
-This document describes Perl6::Builtins version 0.0.2
+This document describes Perl6::Builtins version 0.0.3
 
 
 =head1 SYNOPSIS
@@ -41,6 +80,10 @@ This document describes Perl6::Builtins version 0.0.2
 
     system $system_cmd
         or die "Could not $system_cmd: $!";
+
+    my $package = caller->{package};
+    my $file    = caller->{file};
+    my $line    = caller->{line};
   
   
 =head1 DESCRIPTION
@@ -59,6 +102,47 @@ Perl 5 versions of those builtins.
 If C<system> is loaded on the use line, the builtin is altered so that it
 returns true if the system command suceeds. In any other context, the command
 returns the value in C<$!>.
+
+=item C<caller>
+
+If C<caller> is loaded on the use line, the builtin is altered so that it
+behaves as in Perl 5 in scalar and list contexts. However, if the result of a 
+call to C<caller> is used as a hash reference it returns a reference to a
+hash with the following keys:
+
+=over
+
+=item 'package'
+
+=item 'file'
+
+=item 'line'
+
+=item 'sub'
+
+=item 'args'
+
+=item 'want'
+
+=item 'eval'
+
+=item 'require'
+
+=item 'hints'
+
+=item 'bitmask'
+
+=back
+
+with each of the values for these keys being the equivalent item from
+the list returned by C<caller> in list context. This is useful because
+it means that, instead of:
+
+    $subname = (caller)[3];
+
+you can write the much more readable:
+
+    $subname = caller->{sub};
 
 =back
 

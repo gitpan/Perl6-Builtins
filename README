@@ -1,4 +1,4 @@
-Perl6::Builtins version 0.0.2
+Perl6::Builtins version 0.0.3
 
 Several of the builtins in Perl 6 have different (i.e. more useful, less
 confusing) behaviours than their Perl 5 counterparts. This module provides
